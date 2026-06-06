@@ -684,6 +684,38 @@
                             <div id="ref-divisi-list" class="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto pr-1"></div>
                         </div>
                     </div>
+
+                    <!-- Keamanan & Akses (Ubah PIN Admin) -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-6 mt-6 space-y-4">
+                        <div class="border-b border-slate-200 pb-3 flex items-center gap-3">
+                            <div class="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                                <i class="fa-solid fa-shield-halved text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Keamanan & Kontrol Akses</h3>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Perbarui PIN administrator untuk mengamankan akses ke menu kontrol penuh WMS, katalog barang, dan audit log harian.</p>
+                            </div>
+                        </div>
+                        <form id="change-pin-form" onsubmit="handlePinChange(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end max-w-3xl">
+                            <div class="space-y-1.5 text-xs">
+                                <label class="font-semibold text-slate-700">PIN Lama <span class="text-rose-500">*</span></label>
+                                <input type="password" id="pin-old" required maxlength="4" class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-blue font-mono tracking-widest text-center" placeholder="••••">
+                            </div>
+                            <div class="space-y-1.5 text-xs">
+                                <label class="font-semibold text-slate-700">PIN Baru (4 Digit Angka) <span class="text-rose-500">*</span></label>
+                                <input type="password" id="pin-new" required maxlength="4" class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-blue font-mono tracking-widest text-center" placeholder="••••">
+                            </div>
+                            <div class="space-y-1.5 text-xs">
+                                <label class="font-semibold text-slate-700">Konfirmasi PIN Baru <span class="text-rose-500">*</span></label>
+                                <input type="password" id="pin-confirm" required maxlength="4" class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-blue font-mono tracking-widest text-center" placeholder="••••">
+                            </div>
+                            <div class="sm:col-span-3 flex justify-end pt-2">
+                                <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition-all shadow-sm flex items-center gap-1.5">
+                                    <i class="fa-solid fa-key"></i> Simpan PIN Baru
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </section>
         </main>
@@ -963,7 +995,7 @@
         // 🔑 MASUKKAN KONFIGURASI FIREBASE ANDA DI SINI
         // ===================================================
         const firebaseConfig = {
-            apiKey: "AIzaSyAyfjjl9-gK_P5J-qq5YGC0v3HakYyJp3Q",
+            piKey: "AIzaSyAyfjjl9-gK_P5J-qq5YGC0v3HakYyJp3Q",
             authDomain: "logistik-mrp-wms.firebaseapp.com",
             projectId: "logistik-mrp-wms",
             storageBucket: "logistik-mrp-wms.firebasestorage.app",
@@ -1001,6 +1033,7 @@
         let divisions = JSON.parse(localStorage.getItem('mrp_ref_divisions')) || initialDivisions;
         let inventory = JSON.parse(localStorage.getItem('mrp_unified_inventory_v25')) || initialInventory;
         let transactions = JSON.parse(localStorage.getItem('mrp_unified_txs_v25')) || [];
+        let adminPin = localStorage.getItem('mrp_admin_pin') || '1234';
 
         let outSelectedCategory = '';
         let inSelectedCategory = '';
@@ -1008,7 +1041,7 @@
         let inRowCount = 0;
         let currentStokFilter = 'ALL';
         let currentRefModalType = '';
-        let activeRole = 'admin';
+        let activeRole = 'user';
 
         // Firebase Initialization Block
         let db = null;
@@ -1072,6 +1105,7 @@
                     if (data.categories) categories = data.categories;
                     if (data.suppliers) suppliers = data.suppliers;
                     if (data.divisions) divisions = data.divisions;
+                    if (data.adminPin) adminPin = data.adminPin;
                     saveLocalBackup();
                     updateViews();
                 } else {
@@ -1095,7 +1129,7 @@
 
         function seedFirebaseReferences() {
             db.collection("references").doc("metadata").set({
-                units, categories, suppliers, divisions
+                units, categories, suppliers, divisions, adminPin
             });
         }
 
@@ -1104,6 +1138,7 @@
             localStorage.setItem('mrp_ref_categories', JSON.stringify(categories));
             localStorage.setItem('mrp_ref_suppliers', JSON.stringify(suppliers));
             localStorage.setItem('mrp_ref_divisions', JSON.stringify(divisions));
+            localStorage.setItem('mrp_admin_pin', adminPin);
             localStorage.setItem('mrp_unified_inventory_v25', JSON.stringify(inventory));
             localStorage.setItem('mrp_unified_txs_v25', JSON.stringify(transactions));
         }
@@ -1111,7 +1146,7 @@
         function writeFirebaseReference() {
             if (isFirebaseActive) {
                 db.collection("references").doc("metadata").set({
-                    units, categories, suppliers, divisions
+                    units, categories, suppliers, divisions, adminPin
                 });
             } else {
                 saveLocalBackup();
@@ -1174,7 +1209,7 @@
 
         function submitAdminPin() {
             const pinVal = document.getElementById('admin-pin-input').value;
-            if (pinVal === "1234") {
+            if (pinVal === adminPin) {
                 setRole('admin');
                 closePinModal();
                 showToast("Akses Admin WMS Berhasil!", "success");
@@ -1183,6 +1218,34 @@
                 document.getElementById('admin-pin-input').value = '';
                 document.getElementById('admin-pin-input').focus();
             }
+        }
+
+        function handlePinChange(e) {
+            e.preventDefault();
+            const oldPin = document.getElementById('pin-old').value;
+            const newPin = document.getElementById('pin-new').value;
+            const confirmPin = document.getElementById('pin-confirm').value;
+
+            if (oldPin !== adminPin) {
+                showCustomModal("PIN Lama Salah", "PIN lama yang Anda masukkan tidak sesuai dengan sistem.", "error");
+                return;
+            }
+
+            if (newPin.length !== 4 || isNaN(newPin)) {
+                showCustomModal("Format PIN Salah", "PIN baru harus terdiri dari tepat 4 digit angka.", "error");
+                return;
+            }
+
+            if (newPin !== confirmPin) {
+                showCustomModal("Konfirmasi Tidak Cocok", "Ulangi pengisian konfirmasi PIN baru Anda dengan benar.", "error");
+                return;
+            }
+
+            adminPin = newPin;
+            writeFirebaseReference();
+            
+            document.getElementById('change-pin-form').reset();
+            showCustomModal("PIN Berhasil Diperbarui", "Sistem keamanan WMS telah berhasil mengunci akses admin dengan PIN baru Anda.", "success");
         }
 
         function switchTab(tabId) {
@@ -2147,24 +2210,53 @@
 
         // Gemini AI Engine Core Code
         async function callGeminiAPI(userQuery, systemPrompt, useSearch = false, responseSchema = null) {
-            const apiKey = ""; // Disarankan menggunakan API Key terenkripsi di server, namun disini dikosongkan untuk diisi manual.
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const apiKey = ""; // Canvas will automatically inject active runtime credentials here
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
             
             const contents = [{ role: "user", parts: [{ text: userQuery }] }];
             const payload = { contents };
-            if (useSearch) { payload.tools = [{ "google_search": {} }]; }
-            if (systemPrompt) { payload.systemInstruction = { parts: [{ text: systemPrompt }] }; }
-            if (responseSchema) {
-                payload.generationConfig = { responseMimeType: "application/json", responseSchema };
+            
+            if (useSearch) {
+                payload.tools = [{ "google_search": {} }];
             }
+            if (systemPrompt) {
+                payload.systemInstruction = { parts: [{ text: systemPrompt }] };
+            }
+            if (responseSchema) {
+                payload.generationConfig = { 
+                    responseMimeType: "application/json", 
+                    responseSchema: responseSchema 
+                };
+            }
+            
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            
             const result = await response.json();
-            const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            return { text };
+            const candidate = result.candidates?.[0];
+            
+            if (candidate && candidate.content?.parts?.[0]?.text) {
+                const text = candidate.content.parts[0].text;
+                
+                // Extract search grounding citations if present
+                let sources = [];
+                const groundingMetadata = candidate.groundingMetadata;
+                if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                    sources = groundingMetadata.groundingAttributions
+                        .map(attribution => ({
+                            uri: attribution.web?.uri,
+                            title: attribution.web?.title,
+                        }))
+                        .filter(source => source.uri && source.title);
+                }
+                
+                return { text, sources };
+            } else {
+                throw new Error("Gagal memperoleh respons dari model Gemini.");
+            }
         }
 
         async function triggerAiCommandParser(inputId, btnId, iconId, textId) {
@@ -2274,18 +2366,397 @@
                 showCustomModal("Gagal", "Sistem AI gagal mengurai teks. Pastikan isi parameter Anda lengkap.", "error");
             } finally {
                 textBtn.innerText = "Proses Perintah";
-                iconBtn.className = "fa-solid fa-bolt";
+                iconBtn.className = "fa-bolt";
             }
         }
 
-        // OCR multi-item and safety generator placeholder (Logic mimics parent model logic structure)
-        async function triggerSuratJalanOcr(event) { showToast("Sistem OCR membutuhkan integrasi API Key Gemini.", "error"); }
-        async function triggerAiSkuGeneration() { showToast("Sistem AI membutuhkan konfigurasi API Key.", "error"); }
-        async function generateAiRestockReport() { showToast("Sistem AI membutuhkan konfigurasi API Key.", "error"); }
-        async function generateHseSafetyCheck(containerId) { showCustomModal("Standar Keselamatan", "Selalu gunakan sarung tangan karet dan kacamata pelindung (HSE Standard MRP) saat memindahkan material logistik di area workshop.", "success"); }
+        function getBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        async function triggerSuratJalanOcr(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusText = document.getElementById('ocr-status-text');
+            statusText.innerText = `Sedang memindai: ${file.name}...`;
+            statusText.className = "text-[10px] text-purple-600 font-bold animate-pulse";
+
+            try {
+                const base64Data = await getBase64(file);
+                const mimeType = file.type;
+
+                const sysPrompt = `Anda adalah Spesialis OCR Logistik Cerdas. Ekstrak informasi dari gambar Surat Jalan (Delivery Order).
+                Pilihan Supplier valid yang tersedia di database kami: ${suppliers.join(', ')}.
+                Pilihan Kategori valid: ${categories.join(', ')}.
+                Daftar barang aktif dan SKU di database kami:
+                ${inventory.map(i => `- SKU: ${i.id}, Nama: ${i.name}, Kategori: ${i.category}, Satuan: ${i.unit}`).join('\n')}
+                
+                Tentukan SKU dari daftar kami yang paling mirip dengan deskripsi barang pada gambar surat jalan.`;
+
+                const ocrSchema = {
+                    type: "OBJECT",
+                    properties: {
+                        supplier: { type: "STRING" },
+                        nomorSuratJalan: { type: "STRING" },
+                        tanggal: { type: "STRING", description: "Format tanggal kedatangan YYYY-MM-DD" },
+                        penerima: { type: "STRING" },
+                        kategori: { type: "STRING" },
+                        barangList: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    sku: { type: "STRING" },
+                                    qty: { type: "INTEGER" }
+                                },
+                                required: ["sku", "qty"]
+                            }
+                        }
+                    },
+                    required: ["supplier", "nomorSuratJalan", "tanggal", "penerima", "kategori", "barangList"]
+                };
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: "Lakukan ekstraksi logistik surat jalan ini dengan responseSchema JSON." },
+                            {
+                                inlineData: {
+                                    mimeType: mimeType,
+                                    data: base64Data
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: ocrSchema
+                    },
+                    systemInstruction: {
+                        parts: [{ text: sysPrompt }]
+                    }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!jsonText) throw new Error("Format respons vision salah.");
+
+                const data = JSON.parse(jsonText);
+
+                // Populate extracted fields
+                if (suppliers.includes(data.supplier)) {
+                    document.getElementById('in-supplier').value = data.supplier;
+                } else {
+                    const closest = suppliers.find(s => s.toLowerCase().includes(data.supplier.toLowerCase()));
+                    if (closest) document.getElementById('in-supplier').value = closest;
+                }
+                document.getElementById('in-sj-number').value = data.nomorSuratJalan || "";
+                document.getElementById('in-tanggal').value = data.tanggal || new Date().toISOString().split('T')[0];
+                document.getElementById('in-receiver').value = data.penerima || "Admin Gudang (OCR)";
+
+                if (categories.includes(data.kategori)) {
+                    handleInCategoryChange(data.kategori);
+
+                    const container = document.getElementById('in-items-container');
+                    container.innerHTML = '';
+                    inRowCount = 0;
+
+                    data.barangList.forEach((bar) => {
+                        const target = inventory.find(i => i.id === bar.sku && i.category === data.kategori);
+                        if (!target) return;
+
+                        inRowCount++;
+                        const rowId = `in-row-${inRowCount}`;
+                        const matchingItems = inventory.filter(item => item.category === data.kategori);
+                        const options = matchingItems.map(item => `
+                            <option value="${item.id}" ${item.id === bar.sku ? 'selected' : ''}>${item.name}</option>
+                        `).join('');
+
+                        const rowHTML = `
+                            <div id="${rowId}" class="bg-purple-50/50 p-4 rounded-xl border-2 border-purple-200 relative transition-all">
+                                <div class="flex justify-between items-center mb-3">
+                                    <span class="text-[10px] font-extrabold uppercase text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> AI Scan Inbound #${inRowCount}</span>
+                                    <button type="button" onclick="removeInItemRow('${rowId}')" class="text-rose-500 hover:text-rose-700 text-xs flex items-center gap-1">
+                                        <i class="fa-solid fa-circle-minus"></i> Hapus
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                                    <div class="sm:col-span-6 space-y-1">
+                                        <label class="text-[10px] font-bold text-slate-500 uppercase">Nama Barang</label>
+                                        <select id="select-in-${inRowCount}" onchange="updateInRowUnit('${inRowCount}')" required class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs">
+                                            <option value="" disabled>-- Pilih Barang --</option>
+                                            ${options}
+                                        </select>
+                                    </div>
+                                    <div class="sm:col-span-3 space-y-1">
+                                        <label class="text-[10px] font-bold text-slate-500 uppercase">Jumlah Masuk (Qty)</label>
+                                        <input type="number" min="1" id="qty-in-${inRowCount}" value="${bar.qty}" required class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs">
+                                    </div>
+                                    <div class="sm:col-span-3 space-y-1">
+                                        <label class="text-[10px] font-bold text-slate-500 uppercase">Satuan</label>
+                                        <input type="text" id="unit-in-${inRowCount}" value="${target.unit}" readonly class="w-full bg-slate-100 border border-slate-200 text-slate-500 rounded-lg px-3 py-2 text-xs font-semibold cursor-not-allowed">
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        container.insertAdjacentHTML('beforeend', rowHTML);
+                    });
+
+                    statusText.innerText = "Surat Jalan sukses dipindai!";
+                    statusText.className = "text-[10px] text-emerald-600 font-bold";
+                    showToast("Surat Jalan berhasil di-OCR secara cerdas!", "ai");
+                } else {
+                    showCustomModal("OCR Selesai", `Tercatat data supplier ${data.supplier} dan NO DO ${data.nomorSuratJalan}. Kategori terpilih "${data.kategori}" tidak terdaftar.`, "success");
+                    statusText.innerText = "Pemindaian selesai dengan peringatan.";
+                    statusText.className = "text-[10px] text-amber-600 font-semibold";
+                }
+            } catch (err) {
+                console.error(err);
+                statusText.innerText = "Pindai dokumen gagal.";
+                statusText.className = "text-[10px] text-rose-600 font-semibold";
+                showCustomModal("Vision AI Gagal", "Gagal memproses berkas surat jalan. Silakan periksa format berkas gambar Anda.", "error");
+            }
+        }
+
+        async function triggerAiSkuGeneration() {
+            const name = document.getElementById('add-name').value.trim();
+            if (!name) {
+                showToast("Tuliskan nama barang terlebih dahulu!", "error");
+                return;
+            }
+
+            const textBtn = document.getElementById('ai-sku-text');
+            const spinner = document.getElementById('ai-sku-spinner');
+            textBtn.innerText = "Menganalisis...";
+            spinner.classList.remove('hidden');
+
+            const sysPrompt = "Anda adalah Asisten Master Data WMS. Klasifikasikan material dan buatkan parameter standard logistik.";
+            const query = `Buatkan metadata standard untuk barang bernama: "${name}". Berikan SKU (gunakan huruf kecil & underscore saja), rekomendasi Kategori (pilih di antara: APD, Consumable, Indirect), rekomendasi Satuan standard (pilih di antara: Pcs, Box, Pasang, Roll, Pack, Liter, Can, Unit, Set, Meter), dan angka batas threshold kritis stok minimum.`;
+
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    sku: { type: "STRING" },
+                    category: { type: "STRING" },
+                    unit: { type: "STRING" },
+                    threshold: { type: "INTEGER" }
+                },
+                required: ["sku", "category", "unit", "threshold"]
+            };
+
+            try {
+                const response = await callGeminiAPI(query, sysPrompt, false, schema);
+                const data = JSON.parse(response.text);
+
+                if (data.sku) document.getElementById('add-sku').value = data.sku.toLowerCase();
+                if (data.threshold) document.getElementById('add-threshold').value = data.threshold;
+                if (categories.includes(data.category)) document.getElementById('add-category').value = data.category;
+                if (units.includes(data.unit)) document.getElementById('add-unit').value = data.unit;
+
+                showToast("Daftar SKU & Klasifikasi otomatis berhasil diisi!", "ai");
+            } catch (err) {
+                showToast("Gagal melakukan klasifikasi otomatis.", "error");
+            } finally {
+                textBtn.innerText = "Generate SKU via Gemini AI";
+                spinner.classList.add('hidden');
+            }
+        }
+
+        async function generateAiRestockReport() {
+            const loading = document.getElementById('ai-restock-loading');
+            const result = document.getElementById('ai-restock-result');
+            loading.classList.remove('hidden');
+            result.classList.add('hidden');
+
+            const statusSummary = inventory.map(i => `- ${i.name} (${i.category}): Sisa ${i.stock} ${i.unit} (Limit Kritis: ${i.threshold})`).join('\n');
+            const systemPrompt = "Anda adalah Analis Manajemen Rantai Pasok (Supply Chain Analyst). Susun laporan pengadaan yang sangat terarah, lugas, dan profesional menggunakan format bullet point.";
+            const query = `Berikut adalah data inventaris gudang logistik saat ini:\n${statusSummary}\n\nSupplier yang bekerjasama dengan kami:\n${suppliers.join(', ')}\n\nBuat analisis yang mencakup:\n1. 3 Item paling kritis yang harus segera dipesan ulang beserta taksiran kuantitas belinya.\n2. Nama Supplier mana dari mitra kami yang relevan untuk setiap pemesanan.\n3. Checklist standar penanganan HSE/K3 khusus untuk penyimpanan barang tersebut.`;
+
+            try {
+                const response = await callGeminiAPI(query, systemPrompt, false, null);
+                
+                let htmlFormatted = response.text
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/^\*\s(.*)/gm, '• $1')
+                    .replace(/\n/g, '<br>');
+
+                result.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between border-b border-purple-100 pb-2">
+                            <span class="text-xs font-bold text-purple-900"><i class="fa-solid fa-clipboard-list"></i> Hasil Advisory Suplai</span>
+                            <span class="text-[9px] bg-purple-200 text-purple-800 font-extrabold uppercase px-2 py-0.5 rounded-full">Optimal</span>
+                        </div>
+                        <div class="leading-relaxed text-slate-700 font-medium">${htmlFormatted}</div>
+                    </div>
+                `;
+                result.classList.remove('hidden');
+                showToast("Analisis rekomendasi restock sukses dihasilkan!", "ai");
+            } catch (err) {
+                showCustomModal("Gagal", "Sistem gagal menjalankan algoritma pemrosesan restock AI.", "error");
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+
+        async function generateHseSafetyCheck(containerId) {
+            const container = document.getElementById(containerId);
+            const rows = container.children;
+
+            if (!rows || rows.length === 0) {
+                showCustomModal("Data Kosong", "Silakan tambahkan minimal satu baris barang logistik sebelum melakukan audit keselamatan K3.", "error");
+                return;
+            }
+
+            const barangTertunjuk = [];
+            for (let i = 0; i < rows.length; i++) {
+                const rowId = rows[i].id;
+                const index = rowId.split('-')[2];
+
+                let selectEl = document.getElementById(`select-out-${index}`);
+                let qtyEl = document.getElementById(`qty-out-${index}`);
+
+                if (!selectEl) {
+                    selectEl = document.getElementById(`select-in-${index}`);
+                    qtyEl = document.getElementById(`qty-in-${index}`);
+                }
+
+                if (selectEl && selectEl.value) {
+                    const matchedItem = inventory.find(item => item.id === selectEl.value);
+                    const qty = qtyEl ? qtyEl.value : 1;
+                    if (matchedItem) {
+                        barangTertunjuk.push(`${matchedItem.name} (${matchedItem.category}) sebanyak ${qty} ${matchedItem.unit}`);
+                    }
+                }
+            }
+
+            if (barangTertunjuk.length === 0) {
+                showCustomModal("Barang Belum Dipilih", "Mohon pilih barang di dalam baris formulir terlebih dahulu.", "error");
+                return;
+            }
+
+            showToast("Gemini sedang memetakan risiko K3...", "ai");
+            showCustomModal("Audit Keselamatan AI", `<div class="flex items-center justify-center py-6 gap-2 text-purple-600"><i class="fa-solid fa-circle-notch animate-spin text-xl"></i> Mengevaluasi standar HSE PT. Matra Roda Piranti...</div>`, "ai");
+
+            const sysPrompt = "Anda adalah Safety Officer HSE bersertifikasi K3 Umum Kemnaker RI. Susun instruksi pencegahan kecelakaan kerja yang sangat praktis dan jelas.";
+            const query = `Berikut adalah item logistik yang akan dibawa/ditangani di workshop kami:\n${barangTertunjuk.join('\n')}\n\nBuatkan panduan K3 berupa:\n1. Jenis APD wajib (misal sarung tangan nitril, pelindung mata, masker respirator).\n2. Potensi bahaya (misal licin, iritasi, tersengat, atau terjepit).\n3. Tata cara pemindahan/penyimpanan yang direkomendasikan.`;
+
+            try {
+                const response = await callGeminiAPI(query, sysPrompt, false, null);
+                let htmlFormatted = response.text
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/^\*\s(.*)/gm, '• $1')
+                    .replace(/\n/g, '<br>');
+
+                showCustomModal("✨ Checklist Standar HSE (AI Terintegrasi)", htmlFormatted, "ai");
+            } catch (err) {
+                showCustomModal("Audit K3 Gagal", "Gagal memproses penilaian keselamatan dari Gemini API.", "error");
+            }
+        }
+
+        async function submitAiChatQuery() {
+            const inputEl = document.getElementById('ai-chat-input');
+            const query = inputEl.value.trim();
+            if (!query) return;
+
+            const chatBox = document.getElementById('ai-chat-box');
+            chatBox.innerHTML += `
+                <div class="flex gap-2 justify-end">
+                    <div class="bg-purple-600 text-white rounded-2xl p-3 shadow-sm max-w-[85%] text-right">
+                        ${query}
+                    </div>
+                </div>
+            `;
+            
+            inputEl.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const thinkingId = "ai-think-" + Date.now();
+            chatBox.innerHTML += `
+                <div class="flex gap-2" id="${thinkingId}">
+                    <div class="bg-purple-100 text-purple-700 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-bold">AI</div>
+                    <div class="bg-white border border-slate-100 rounded-2xl p-3 shadow-sm max-w-[85%] flex items-center gap-2">
+                        <i class="fa-solid fa-circle-notch text-purple-600 animate-spin"></i>
+                        <span>Sedang menelusuri web dan merumuskan jawaban...</span>
+                    </div>
+                </div>
+            `;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const systemPrompt = "Anda adalah asisten konsultan logistik & HSE terpercaya. Berikan jawaban yang ramah, informatif, dan ringkas. Gunakan hasil dari penelusuran google search secara akurat dan cantumkan daftar sitasi web di akhir.";
+
+            try {
+                const response = await callGeminiAPI(query, systemPrompt, true, null);
+                document.getElementById(thinkingId).remove();
+
+                let formattedResponse = response.text
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/^\*\s(.*)/gm, '• $1')
+                    .replace(/\n/g, '<br>');
+
+                // Append grounding citations beautifully if available
+                let citationsMarkup = "";
+                if (response.sources && response.sources.length > 0) {
+                    citationsMarkup += `
+                        <div class="mt-3 pt-2.5 border-t border-purple-100/50 text-[10px] text-purple-900/70 space-y-1">
+                            <strong class="text-purple-950 flex items-center gap-1"><i class="fa-solid fa-earth-americas"></i> Sumber Penelusuran Terverifikasi:</strong>
+                    `;
+                    // Remove duplicate URLs
+                    const uniqueSources = Array.from(new Set(response.sources.map(s => s.uri)))
+                        .map(uri => response.sources.find(s => s.uri === uri));
+
+                    uniqueSources.slice(0, 3).forEach((src, idx) => {
+                        citationsMarkup += `
+                            <div class="flex items-center gap-1 text-slate-500 font-medium">
+                                <span>[${idx + 1}]</span>
+                                <a href="${src.uri}" target="_blank" class="text-purple-700 hover:underline hover:text-purple-900 truncate max-w-xs font-semibold flex items-center gap-0.5">
+                                    ${src.title || "Referensi Eksternal"} <i class="fa-solid fa-up-right-from-square text-[8px]"></i>
+                                </a>
+                            </div>
+                        `;
+                    });
+                    citationsMarkup += `</div>`;
+                }
+
+                chatBox.innerHTML += `
+                    <div class="flex gap-2 animate-fade-in">
+                        <div class="bg-purple-100 text-purple-700 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-bold">AI</div>
+                        <div class="bg-white border border-slate-100 rounded-2xl p-3 shadow-sm max-w-[85%] leading-relaxed text-slate-700">
+                            ${formattedResponse}
+                            ${citationsMarkup}
+                        </div>
+                    </div>
+                `;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } catch (error) {
+                console.error("AI Chatbot error:", error);
+                document.getElementById(thinkingId).innerHTML = `
+                    <div class="bg-rose-50 text-rose-700 p-3 rounded-2xl flex items-center gap-2">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                        <span>Gagal merespons pertanyaan Anda. Pastikan koneksi internet aktif.</span>
+                    </div>
+                `;
+            }
+        }
 
         window.onload = function() {
             initializeFirebase();
+            setRole(activeRole);
             updateViews();
         };
     </script>
